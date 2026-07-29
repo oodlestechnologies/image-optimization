@@ -3,6 +3,12 @@
 
 function handler(event) {
     var request = event.request;
+    // Convert HEAD to GET so the Lambda origin (reached via OriginGroup failover)
+    // receives GET. Lambda@Edge at origin-request handles the primary origin,
+    // but the OriginGroup fallback bypasses origin-request triggers.
+    if (request.method === 'HEAD') {
+        request.method = 'GET';
+    }
     var originalImagePath = request.uri;
     //  validate, process and normalize the requested operations in query parameters
     var normalizedOperations = {};
