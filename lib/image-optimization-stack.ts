@@ -284,6 +284,19 @@ export class ImageOptimizationStack extends Stack {
       sourceArn: `arn:aws:cloudfront::${this.account}:distribution/${imageDelivery.distributionId}`
     })
 
+    // OAC-signed (SigV4) requests to a Lambda Function URL are authorized against the
+    // underlying function's invoke permission, not just the function URL's - without
+    // this, CloudFront can intermittently get Access Denied invoking the origin, which
+    // the OriginGroup treats as an origin failure. Using CfnPermission directly since
+    // the pinned CDK version's addPermission() helper doesn't yet expose
+    // invokedViaFunctionUrl (it maps to the FunctionUrlAuthType condition below).
+    new lambda.CfnPermission(this, "AllowCloudFrontServicePrincipal2", {
+      action: "lambda:InvokeFunction",
+      functionName: imageProcessing.functionName,
+      principal: "cloudfront.amazonaws.com",
+      functionUrlAuthType: "AWS_IAM",
+    })
+
     new CfnOutput(this, 'ImageDeliveryDomain', {
       description: 'Domain name of image delivery',
       value: imageDelivery.distributionDomainName
