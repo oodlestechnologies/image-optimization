@@ -11,8 +11,12 @@ const TRANSFORMED_IMAGE_CACHE_TTL = process.env.transformedImageCacheTTL;
 const MAX_IMAGE_SIZE = parseInt(process.env.maxImageSize);
 
 export const handler = async (event) => {
-    // Validate if this is a GET request
-    if (!event.requestContext || !event.requestContext.http || !(event.requestContext.http.method === 'GET')) return sendError(400, 'Only GET method is supported', event);
+    // Validate if this is a GET or HEAD request
+    // CloudFront Functions cannot change HEAD to GET (CF restriction), so HEAD
+    // reaches the origin unchanged. Process HEAD like GET; Lambda URL strips
+    // the body automatically, and CloudFront serves subsequent HEAD requests
+    // from the cached GET response with correct Content-Length.
+    if (!event.requestContext || !event.requestContext.http || !(['GET', 'HEAD'].includes(event.requestContext.http.method))) return sendError(400, 'Only GET and HEAD methods are supported', event);
     // An example of expected path is /images/rio/1.jpeg/format=auto,width=100 or /images/rio/1.jpeg/original where /images/rio/1.jpeg is the path of the original image
     var imagePathArray = event.requestContext.http.path.split('/');
     // get the requested image operations
