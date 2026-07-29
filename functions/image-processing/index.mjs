@@ -11,8 +11,9 @@ const TRANSFORMED_IMAGE_CACHE_TTL = process.env.transformedImageCacheTTL;
 const MAX_IMAGE_SIZE = parseInt(process.env.maxImageSize);
 
 export const handler = async (event) => {
-    // Validate if this is a GET request
-    if (!event.requestContext || !event.requestContext.http || !(event.requestContext.http.method === 'GET')) return sendError(400, 'Only GET method is supported', event);
+    // Validate if this is a GET or HEAD request (crawlers/CDNs probe media URLs with HEAD)
+    const httpMethod = event.requestContext && event.requestContext.http && event.requestContext.http.method;
+    if (httpMethod !== 'GET' && httpMethod !== 'HEAD') return sendError(400, 'Only GET and HEAD methods are supported', event);
     // An example of expected path is /images/rio/1.jpeg/format=auto,width=100 or /images/rio/1.jpeg/original where /images/rio/1.jpeg is the path of the original image
     var imagePathArray = event.requestContext.http.path.split('/');
     // get the requested image operations
@@ -114,15 +115,24 @@ export const handler = async (event) => {
     // Return error if the image is too big and a redirection to the generated image was not possible, else return transformed image
     if (imageTooBig) {
         return sendError(403, 'Requested transformed image is too big', '');
-    } else return {
+    }
+    // Explicitly set Content-Length so HEAD requests report the real size instead of an
+    // empty body (CloudFront/Lambda Function URL do not reliably infer it for HEAD when
+    // this origin is used as an OriginGroup failover target).
+    const responseHeaders = {
+        'Content-Type': contentType,
+        'Cache-Control': TRANSFORMED_IMAGE_CACHE_TTL,
+        'Content-Length': Buffer.byteLength(transformedImage).toString(),
+        'Server-Timing': timingLog
+    };
+    if (httpMethod === 'HEAD') {
+        return { statusCode: 200, headers: responseHeaders };
+    }
+    return {
         statusCode: 200,
         body: transformedImage.toString('base64'),
         isBase64Encoded: true,
-        headers: {
-            'Content-Type': contentType,
-            'Cache-Control': TRANSFORMED_IMAGE_CACHE_TTL,
-            'Server-Timing': timingLog
-        }
+        headers: responseHeaders
     };
 };
 
