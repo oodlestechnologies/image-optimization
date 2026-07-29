@@ -1,5 +1,6 @@
 *.js
 !/functions/url-rewrite/index.js
+!/functions/head-to-get-edge/index.js
 !jest.config.js
 *.d.ts
 node_modules

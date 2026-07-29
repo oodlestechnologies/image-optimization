@@ -34,6 +34,7 @@ type ImageDeliveryCacheBehaviorConfig = {
   cachePolicy: any;
   functionAssociations: any;
   responseHeadersPolicy?: any;
+  edgeLambdas?: any;
 };
 
 type LambdaEnv = {
@@ -205,6 +206,19 @@ export class ImageOptimizationStack extends Stack {
       functionName: `urlRewriteFunction${this.node.addr}`,
     });
 
+    // Lambda@Edge (Origin Request): rewrite HEAD to GET before it reaches the
+    // image-processing Lambda Function URL origin, since Function URLs cannot serve
+    // HEAD requests correctly (they zero out Content-Length regardless of what the
+    // handler sets). CloudFront still applies its own correct HEAD handling (keep
+    // headers, drop body) toward the original viewer, since it has a full, correctly
+    // sized response from the origin to work with. Must be declared as an EdgeFunction
+    // so CDK replicates it to us-east-1 as Lambda@Edge requires.
+    const headToGetEdgeFunction = new cloudfront.experimental.EdgeFunction(this, 'HeadToGetEdgeFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('functions/head-to-get-edge'),
+    });
+
     var imageDeliveryCacheBehaviorConfig: ImageDeliveryCacheBehaviorConfig = {
       origin: imageOrigin,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -217,6 +231,10 @@ export class ImageOptimizationStack extends Stack {
       functionAssociations: [{
         eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
         function: urlRewriteFunction,
+      }],
+      edgeLambdas: [{
+        functionVersion: headToGetEdgeFunction.currentVersion,
+        eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
       }],
     }
 
