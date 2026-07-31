@@ -10,9 +10,11 @@ const app = new cdk.App();
 // the stack environment-agnostic.
 const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION };
 
-// ProfileA stack
+// Stage stacks
 new ImageOptimizationStack(app, "ImgTransformationStackOodlesllc", { env });
-
-// Dev stack
 new ImageOptimizationStack(app, "ImgTransformationStackPublic", { env });
+
+// Prod stacks
+new ImageOptimizationStack(app, "ImgTransformationStackOodlesllc-prod", { env });
+new ImageOptimizationStack(app, "ImgTransformationStackPublic-prod", { env });
 
